@@ -4,6 +4,10 @@ ReserveFlow is a Go REST API for reserving limited inventory. Two requests can c
 
 This repository contains a backend, PostgreSQL schema, OpenAPI contract and executable HTTP examples. Alpha and Beta are synthetic tenants for demonstrating isolation. There is no payment integration or browser application.
 
+![ReserveFlow OpenAPI reference](docs/screenshots/openapi-reference.png)
+
+This image renders the committed OpenAPI contract with Swagger UI. It is API documentation, not a business dashboard or a recorded response from a running server.
+
 ## Run locally
 
 Requirements: Docker Desktop with Linux containers, Docker Compose v2, Node.js 22 or newer, and PowerShell on Windows. Go is compiled inside Docker; a native Go installation is optional.

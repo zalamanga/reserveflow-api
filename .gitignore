@@ -1,5 +1,7 @@
 .local/
 .env
+.env.*
+!.env.example
 *.exe
 coverage.out
 bin/
