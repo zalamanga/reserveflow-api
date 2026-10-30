@@ -1,0 +1,880 @@
+{
+    "openapi":  "3.0.3",
+    "info":  {
+                 "title":  "ReserveFlow REST API",
+                 "version":  "1.0.0",
+                 "description":  "Tenant-scoped inventory holds. All examples are synthetic. Expiry is derived using expiresAt \u003c= current server time. Idempotency replays the original response, including its original timestamps and state."
+             },
+    "servers":  [
+                    {
+                        "url":  "http://127.0.0.1:8099"
+                    }
+                ],
+    "security":  [
+                     {
+                         "TenantKey":  [
+
+                                       ]
+                     }
+                 ],
+    "paths":  {
+                  "/healthz":  {
+                                   "get":  {
+                                               "operationId":  "health",
+                                               "security":  [
+
+                                                            ],
+                                               "responses":  {
+                                                                 "200":  {
+                                                                             "description":  "PostgreSQL reachable",
+                                                                             "content":  {
+                                                                                             "application/json":  {
+                                                                                                                      "schema":  {
+                                                                                                                                     "type":  "object",
+                                                                                                                                     "properties":  {
+                                                                                                                                                        "status":  {
+                                                                                                                                                                       "type":  "string",
+                                                                                                                                                                       "enum":  [
+                                                                                                                                                                                    "ok"
+                                                                                                                                                                                ]
+                                                                                                                                                                   }
+                                                                                                                                                    },
+                                                                                                                                     "required":  [
+                                                                                                                                                      "status"
+                                                                                                                                                  ]
+                                                                                                                                 }
+                                                                                                                  }
+                                                                                         }
+                                                                         },
+                                                                 "503":  {
+                                                                             "$ref":  "#/components/responses/Unavailable"
+                                                                         }
+                                                             }
+                                           }
+                               },
+                  "/openapi.json":  {
+                                        "get":  {
+                                                    "operationId":  "openapi",
+                                                    "security":  [
+
+                                                                 ],
+                                                    "responses":  {
+                                                                      "200":  {
+                                                                                  "description":  "This OpenAPI document",
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "type":  "object"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              }
+                                                                              }
+                                                                  }
+                                                }
+                                    },
+                  "/v1/products":  {
+                                       "get":  {
+                                                   "operationId":  "listProducts",
+                                                   "parameters":  [
+                                                                      {
+                                                                          "$ref":  "#/components/parameters/Limit"
+                                                                      },
+                                                                      {
+                                                                          "$ref":  "#/components/parameters/Cursor"
+                                                                      }
+                                                                  ],
+                                                   "responses":  {
+                                                                     "200":  {
+                                                                                 "description":  "Tenant products ordered by increasing ID",
+                                                                                 "content":  {
+                                                                                                 "application/json":  {
+                                                                                                                          "schema":  {
+                                                                                                                                         "$ref":  "#/components/schemas/ProductPage"
+                                                                                                                                     }
+                                                                                                                      }
+                                                                                             }
+                                                                             },
+                                                                     "400":  {
+                                                                                 "$ref":  "#/components/responses/BadRequest"
+                                                                             },
+                                                                     "401":  {
+                                                                                 "$ref":  "#/components/responses/Unauthorized"
+                                                                             },
+                                                                     "503":  {
+                                                                                 "$ref":  "#/components/responses/Unavailable"
+                                                                             }
+                                                                 }
+                                               },
+                                       "post":  {
+                                                    "operationId":  "createProduct",
+                                                    "description":  "Create initial stock. SKU is unique per tenant. Product creation has no idempotency replay; a repeated SKU returns 409. No query parameters.",
+                                                    "requestBody":  {
+                                                                        "required":  true,
+                                                                        "content":  {
+                                                                                        "application/json":  {
+                                                                                                                 "schema":  {
+                                                                                                                                "$ref":  "#/components/schemas/CreateProduct"
+                                                                                                                            }
+                                                                                                             }
+                                                                                    }
+                                                                    },
+                                                    "responses":  {
+                                                                      "201":  {
+                                                                                  "description":  "Product created",
+                                                                                  "content":  {
+                                                                                                  "application/json":  {
+                                                                                                                           "schema":  {
+                                                                                                                                          "$ref":  "#/components/schemas/Product"
+                                                                                                                                      }
+                                                                                                                       }
+                                                                                              }
+                                                                              },
+                                                                      "400":  {
+                                                                                  "$ref":  "#/components/responses/BadRequest"
+                                                                              },
+                                                                      "401":  {
+                                                                                  "$ref":  "#/components/responses/Unauthorized"
+                                                                              },
+                                                                      "409":  {
+                                                                                  "$ref":  "#/components/responses/Conflict"
+                                                                              },
+                                                                      "413":  {
+                                                                                  "$ref":  "#/components/responses/TooLarge"
+                                                                              },
+                                                                      "415":  {
+                                                                                  "$ref":  "#/components/responses/MediaType"
+                                                                              },
+                                                                      "503":  {
+                                                                                  "$ref":  "#/components/responses/Unavailable"
+                                                                              }
+                                                                  }
+                                                }
+                                   },
+                  "/v1/products/{id}":  {
+                                            "parameters":  [
+                                                               {
+                                                                   "$ref":  "#/components/parameters/ID"
+                                                               }
+                                                           ],
+                                            "get":  {
+                                                        "operationId":  "getProduct",
+                                                        "description":  "reserved sums held reservations whose expiresAt is strictly after server time. available = onHand - reserved. Confirmations decrement onHand.",
+                                                        "responses":  {
+                                                                          "200":  {
+                                                                                      "description":  "Current product availability",
+                                                                                      "content":  {
+                                                                                                      "application/json":  {
+                                                                                                                               "schema":  {
+                                                                                                                                              "$ref":  "#/components/schemas/Product"
+                                                                                                                                          }
+                                                                                                                           }
+                                                                                                  }
+                                                                                  },
+                                                                          "400":  {
+                                                                                      "$ref":  "#/components/responses/BadRequest"
+                                                                                  },
+                                                                          "401":  {
+                                                                                      "$ref":  "#/components/responses/Unauthorized"
+                                                                                  },
+                                                                          "404":  {
+                                                                                      "$ref":  "#/components/responses/NotFound"
+                                                                                  },
+                                                                          "503":  {
+                                                                                      "$ref":  "#/components/responses/Unavailable"
+                                                                                  }
+                                                                      }
+                                                    }
+                                        },
+                  "/v1/reservations":  {
+                                           "get":  {
+                                                       "operationId":  "listReservations",
+                                                       "parameters":  [
+                                                                          {
+                                                                              "$ref":  "#/components/parameters/Limit"
+                                                                          },
+                                                                          {
+                                                                              "$ref":  "#/components/parameters/Cursor"
+                                                                          }
+                                                                      ],
+                                                       "responses":  {
+                                                                         "200":  {
+                                                                                     "description":  "Tenant reservations ordered by increasing ID, with derived expired state",
+                                                                                     "content":  {
+                                                                                                     "application/json":  {
+                                                                                                                              "schema":  {
+                                                                                                                                             "$ref":  "#/components/schemas/ReservationPage"
+                                                                                                                                         }
+                                                                                                                          }
+                                                                                                 }
+                                                                                 },
+                                                                         "400":  {
+                                                                                     "$ref":  "#/components/responses/BadRequest"
+                                                                                 },
+                                                                         "401":  {
+                                                                                     "$ref":  "#/components/responses/Unauthorized"
+                                                                                 },
+                                                                         "503":  {
+                                                                                     "$ref":  "#/components/responses/Unavailable"
+                                                                                 }
+                                                                     }
+                                                   },
+                                           "post":  {
+                                                        "operationId":  "createReservation",
+                                                        "description":  "Reserve stock for 1..3600 seconds. Same tenant key + normalized request replays original bytes/status. Different payload or route using the same key returns 409. Availability failures are persisted and replayed; use a new key for a new attempt. No query parameters.",
+                                                        "parameters":  [
+                                                                           {
+                                                                               "$ref":  "#/components/parameters/IdempotencyKey"
+                                                                           }
+                                                                       ],
+                                                        "requestBody":  {
+                                                                            "required":  true,
+                                                                            "content":  {
+                                                                                            "application/json":  {
+                                                                                                                     "schema":  {
+                                                                                                                                    "$ref":  "#/components/schemas/CreateReservation"
+                                                                                                                                }
+                                                                                                                 }
+                                                                                        }
+                                                                        },
+                                                        "responses":  {
+                                                                          "201":  {
+                                                                                      "description":  "Hold created or original hold response replayed",
+                                                                                      "headers":  {
+                                                                                                      "Idempotency-Replayed":  {
+                                                                                                                                   "description":  "Only present on replay",
+                                                                                                                                   "schema":  {
+                                                                                                                                                  "type":  "string",
+                                                                                                                                                  "enum":  [
+                                                                                                                                                               "true"
+                                                                                                                                                           ]
+                                                                                                                                              }
+                                                                                                                               }
+                                                                                                  },
+                                                                                      "content":  {
+                                                                                                      "application/json":  {
+                                                                                                                               "schema":  {
+                                                                                                                                              "$ref":  "#/components/schemas/Reservation"
+                                                                                                                                          }
+                                                                                                                           }
+                                                                                                  }
+                                                                                  },
+                                                                          "400":  {
+                                                                                      "$ref":  "#/components/responses/BadRequest"
+                                                                                  },
+                                                                          "401":  {
+                                                                                      "$ref":  "#/components/responses/Unauthorized"
+                                                                                  },
+                                                                          "404":  {
+                                                                                      "$ref":  "#/components/responses/NotFound"
+                                                                                  },
+                                                                          "409":  {
+                                                                                      "$ref":  "#/components/responses/Conflict"
+                                                                                  },
+                                                                          "413":  {
+                                                                                      "$ref":  "#/components/responses/TooLarge"
+                                                                                  },
+                                                                          "415":  {
+                                                                                      "$ref":  "#/components/responses/MediaType"
+                                                                                  },
+                                                                          "503":  {
+                                                                                      "$ref":  "#/components/responses/Unavailable"
+                                                                                  }
+                                                                      }
+                                                    }
+                                       },
+                  "/v1/reservations/{id}":  {
+                                                "parameters":  [
+                                                                   {
+                                                                       "$ref":  "#/components/parameters/ID"
+                                                                   }
+                                                               ],
+                                                "get":  {
+                                                            "operationId":  "getReservation",
+                                                            "description":  "Read current effective state. Use this endpoint after an old idempotent response is replayed.",
+                                                            "responses":  {
+                                                                              "200":  {
+                                                                                          "description":  "Reservation with current effective state",
+                                                                                          "content":  {
+                                                                                                          "application/json":  {
+                                                                                                                                   "schema":  {
+                                                                                                                                                  "$ref":  "#/components/schemas/Reservation"
+                                                                                                                                              }
+                                                                                                                               }
+                                                                                                      }
+                                                                                      },
+                                                                              "400":  {
+                                                                                          "$ref":  "#/components/responses/BadRequest"
+                                                                                      },
+                                                                              "401":  {
+                                                                                          "$ref":  "#/components/responses/Unauthorized"
+                                                                                      },
+                                                                              "404":  {
+                                                                                          "$ref":  "#/components/responses/NotFound"
+                                                                                      },
+                                                                              "503":  {
+                                                                                          "$ref":  "#/components/responses/Unavailable"
+                                                                                      }
+                                                                          }
+                                                        }
+                                            },
+                  "/v1/reservations/{id}/confirm":  {
+                                                        "parameters":  [
+                                                                           {
+                                                                               "$ref":  "#/components/parameters/ID"
+                                                                           }
+                                                                       ],
+                                                        "post":  {
+                                                                     "operationId":  "confirmReservation",
+                                                                     "description":  "Confirm an unexpired hold and atomically decrement onHand. Send {}. Same key replays success; a new key on a terminal reservation returns 409. No query parameters.",
+                                                                     "parameters":  [
+                                                                                        {
+                                                                                            "$ref":  "#/components/parameters/IdempotencyKey"
+                                                                                        }
+                                                                                    ],
+                                                                     "requestBody":  {
+                                                                                         "$ref":  "#/components/requestBodies/EmptyObject"
+                                                                                     },
+                                                                     "responses":  {
+                                                                                       "200":  {
+                                                                                                   "$ref":  "#/components/responses/ReservationOK"
+                                                                                               },
+                                                                                       "400":  {
+                                                                                                   "$ref":  "#/components/responses/BadRequest"
+                                                                                               },
+                                                                                       "401":  {
+                                                                                                   "$ref":  "#/components/responses/Unauthorized"
+                                                                                               },
+                                                                                       "404":  {
+                                                                                                   "$ref":  "#/components/responses/NotFound"
+                                                                                               },
+                                                                                       "409":  {
+                                                                                                   "$ref":  "#/components/responses/Conflict"
+                                                                                               },
+                                                                                       "410":  {
+                                                                                                   "$ref":  "#/components/responses/Gone"
+                                                                                               },
+                                                                                       "413":  {
+                                                                                                   "$ref":  "#/components/responses/TooLarge"
+                                                                                               },
+                                                                                       "415":  {
+                                                                                                   "$ref":  "#/components/responses/MediaType"
+                                                                                               },
+                                                                                       "503":  {
+                                                                                                   "$ref":  "#/components/responses/Unavailable"
+                                                                                               }
+                                                                                   }
+                                                                 }
+                                                    },
+                  "/v1/reservations/{id}/cancel":  {
+                                                       "parameters":  [
+                                                                          {
+                                                                              "$ref":  "#/components/parameters/ID"
+                                                                          }
+                                                                      ],
+                                                       "post":  {
+                                                                    "operationId":  "cancelReservation",
+                                                                    "description":  "Cancel an unexpired hold. onHand does not change. Send {}. No query parameters.",
+                                                                    "parameters":  [
+                                                                                       {
+                                                                                           "$ref":  "#/components/parameters/IdempotencyKey"
+                                                                                       }
+                                                                                   ],
+                                                                    "requestBody":  {
+                                                                                        "$ref":  "#/components/requestBodies/EmptyObject"
+                                                                                    },
+                                                                    "responses":  {
+                                                                                      "200":  {
+                                                                                                  "$ref":  "#/components/responses/ReservationOK"
+                                                                                              },
+                                                                                      "400":  {
+                                                                                                  "$ref":  "#/components/responses/BadRequest"
+                                                                                              },
+                                                                                      "401":  {
+                                                                                                  "$ref":  "#/components/responses/Unauthorized"
+                                                                                              },
+                                                                                      "404":  {
+                                                                                                  "$ref":  "#/components/responses/NotFound"
+                                                                                              },
+                                                                                      "409":  {
+                                                                                                  "$ref":  "#/components/responses/Conflict"
+                                                                                              },
+                                                                                      "410":  {
+                                                                                                  "$ref":  "#/components/responses/Gone"
+                                                                                              },
+                                                                                      "413":  {
+                                                                                                  "$ref":  "#/components/responses/TooLarge"
+                                                                                              },
+                                                                                      "415":  {
+                                                                                                  "$ref":  "#/components/responses/MediaType"
+                                                                                              },
+                                                                                      "503":  {
+                                                                                                  "$ref":  "#/components/responses/Unavailable"
+                                                                                              }
+                                                                                  }
+                                                                }
+                                                   },
+                  "/v1/audit":  {
+                                    "get":  {
+                                                "operationId":  "listAudit",
+                                                "description":  "Committed product/hold/confirm/cancel events, scoped to the authenticated tenant. Expiry is derived and does not create an audit event.",
+                                                "parameters":  [
+                                                                   {
+                                                                       "$ref":  "#/components/parameters/Limit"
+                                                                   },
+                                                                   {
+                                                                       "$ref":  "#/components/parameters/Cursor"
+                                                                   }
+                                                               ],
+                                                "responses":  {
+                                                                  "200":  {
+                                                                              "description":  "Audit events ordered by increasing ID",
+                                                                              "content":  {
+                                                                                              "application/json":  {
+                                                                                                                       "schema":  {
+                                                                                                                                      "$ref":  "#/components/schemas/AuditPage"
+                                                                                                                                  }
+                                                                                                                   }
+                                                                                          }
+                                                                          },
+                                                                  "400":  {
+                                                                              "$ref":  "#/components/responses/BadRequest"
+                                                                          },
+                                                                  "401":  {
+                                                                              "$ref":  "#/components/responses/Unauthorized"
+                                                                          },
+                                                                  "503":  {
+                                                                              "$ref":  "#/components/responses/Unavailable"
+                                                                          }
+                                                              }
+                                            }
+                                }
+              },
+    "components":  {
+                       "securitySchemes":  {
+                                               "TenantKey":  {
+                                                                 "type":  "http",
+                                                                 "scheme":  "bearer",
+                                                                 "description":  "64-character local synthetic tenant API key. The API process receives only its SHA-256 digest."
+                                                             }
+                                           },
+                       "parameters":  {
+                                          "ID":  {
+                                                     "name":  "id",
+                                                     "in":  "path",
+                                                     "required":  true,
+                                                     "schema":  {
+                                                                    "type":  "integer",
+                                                                    "format":  "int64",
+                                                                    "minimum":  1
+                                                                }
+                                                 },
+                                          "Limit":  {
+                                                        "name":  "limit",
+                                                        "in":  "query",
+                                                        "schema":  {
+                                                                       "type":  "integer",
+                                                                       "minimum":  1,
+                                                                       "maximum":  100,
+                                                                       "default":  20
+                                                                   }
+                                                    },
+                                          "Cursor":  {
+                                                         "name":  "cursor",
+                                                         "in":  "query",
+                                                         "description":  "Opaque cursor returned for the same tenant and resource. Pagination is forward-only and is not a historical snapshot.",
+                                                         "schema":  {
+                                                                        "type":  "string",
+                                                                        "maxLength":  256
+                                                                    }
+                                                     },
+                                          "IdempotencyKey":  {
+                                                                 "name":  "Idempotency-Key",
+                                                                 "in":  "header",
+                                                                 "required":  true,
+                                                                 "schema":  {
+                                                                                "type":  "string",
+                                                                                "pattern":  "^[A-Za-z0-9_-]{8,80}$"
+                                                                            }
+                                                             }
+                                      },
+                       "requestBodies":  {
+                                             "EmptyObject":  {
+                                                                 "required":  true,
+                                                                 "content":  {
+                                                                                 "application/json":  {
+                                                                                                          "schema":  {
+                                                                                                                         "type":  "object",
+                                                                                                                         "additionalProperties":  false
+                                                                                                                     }
+                                                                                                      }
+                                                                             }
+                                                             }
+                                         },
+                       "schemas":  {
+                                       "Error":  {
+                                                     "type":  "object",
+                                                     "required":  [
+                                                                      "error"
+                                                                  ],
+                                                     "properties":  {
+                                                                        "error":  {
+                                                                                      "type":  "object",
+                                                                                      "required":  [
+                                                                                                       "code",
+                                                                                                       "message"
+                                                                                                   ],
+                                                                                      "properties":  {
+                                                                                                         "code":  {
+                                                                                                                      "type":  "string"
+                                                                                                                  },
+                                                                                                         "message":  {
+                                                                                                                         "type":  "string"
+                                                                                                                     }
+                                                                                                     }
+                                                                                  }
+                                                                    }
+                                                 },
+                                       "CreateProduct":  {
+                                                             "type":  "object",
+                                                             "additionalProperties":  false,
+                                                             "required":  [
+                                                                              "sku",
+                                                                              "name",
+                                                                              "onHand"
+                                                                          ],
+                                                             "properties":  {
+                                                                                "sku":  {
+                                                                                            "type":  "string",
+                                                                                            "pattern":  "^[A-Z0-9][A-Z0-9_-]{0,39}$",
+                                                                                            "example":  "PAPER-A4"
+                                                                                        },
+                                                                                "name":  {
+                                                                                             "type":  "string",
+                                                                                             "minLength":  1,
+                                                                                             "maxLength":  120,
+                                                                                             "example":  "A4 paper box"
+                                                                                         },
+                                                                                "onHand":  {
+                                                                                               "type":  "integer",
+                                                                                               "minimum":  0,
+                                                                                               "maximum":  1000000
+                                                                                           }
+                                                                            }
+                                                         },
+                                       "CreateReservation":  {
+                                                                 "type":  "object",
+                                                                 "additionalProperties":  false,
+                                                                 "required":  [
+                                                                                  "productId",
+                                                                                  "quantity",
+                                                                                  "ttlSeconds"
+                                                                              ],
+                                                                 "properties":  {
+                                                                                    "productId":  {
+                                                                                                      "type":  "integer",
+                                                                                                      "format":  "int64",
+                                                                                                      "minimum":  1
+                                                                                                  },
+                                                                                    "quantity":  {
+                                                                                                     "type":  "integer",
+                                                                                                     "minimum":  1,
+                                                                                                     "maximum":  1000000
+                                                                                                 },
+                                                                                    "ttlSeconds":  {
+                                                                                                       "type":  "integer",
+                                                                                                       "minimum":  1,
+                                                                                                       "maximum":  3600
+                                                                                                   }
+                                                                                }
+                                                             },
+                                       "Product":  {
+                                                       "type":  "object",
+                                                       "required":  [
+                                                                        "id",
+                                                                        "sku",
+                                                                        "name",
+                                                                        "onHand",
+                                                                        "reserved",
+                                                                        "available",
+                                                                        "createdAt"
+                                                                    ],
+                                                       "properties":  {
+                                                                          "id":  {
+                                                                                     "type":  "integer",
+                                                                                     "format":  "int64"
+                                                                                 },
+                                                                          "sku":  {
+                                                                                      "type":  "string"
+                                                                                  },
+                                                                          "name":  {
+                                                                                       "type":  "string"
+                                                                                   },
+                                                                          "onHand":  {
+                                                                                         "type":  "integer"
+                                                                                     },
+                                                                          "reserved":  {
+                                                                                           "type":  "integer"
+                                                                                       },
+                                                                          "available":  {
+                                                                                            "type":  "integer"
+                                                                                        },
+                                                                          "createdAt":  {
+                                                                                            "type":  "string",
+                                                                                            "format":  "date-time"
+                                                                                        }
+                                                                      }
+                                                   },
+                                       "Reservation":  {
+                                                           "type":  "object",
+                                                           "required":  [
+                                                                            "id",
+                                                                            "productId",
+                                                                            "quantity",
+                                                                            "state",
+                                                                            "expiresAt",
+                                                                            "createdAt",
+                                                                            "updatedAt"
+                                                                        ],
+                                                           "properties":  {
+                                                                              "id":  {
+                                                                                         "type":  "integer",
+                                                                                         "format":  "int64"
+                                                                                     },
+                                                                              "productId":  {
+                                                                                                "type":  "integer",
+                                                                                                "format":  "int64"
+                                                                                            },
+                                                                              "quantity":  {
+                                                                                               "type":  "integer"
+                                                                                           },
+                                                                              "state":  {
+                                                                                            "type":  "string",
+                                                                                            "enum":  [
+                                                                                                         "held",
+                                                                                                         "confirmed",
+                                                                                                         "cancelled",
+                                                                                                         "expired"
+                                                                                                     ]
+                                                                                        },
+                                                                              "expiresAt":  {
+                                                                                                "type":  "string",
+                                                                                                "format":  "date-time"
+                                                                                            },
+                                                                              "createdAt":  {
+                                                                                                "type":  "string",
+                                                                                                "format":  "date-time"
+                                                                                            },
+                                                                              "updatedAt":  {
+                                                                                                "type":  "string",
+                                                                                                "format":  "date-time"
+                                                                                            }
+                                                                          }
+                                                       },
+                                       "Event":  {
+                                                     "type":  "object",
+                                                     "required":  [
+                                                                      "id",
+                                                                      "action",
+                                                                      "productId",
+                                                                      "reservationId",
+                                                                      "quantity",
+                                                                      "happenedAt"
+                                                                  ],
+                                                     "properties":  {
+                                                                        "id":  {
+                                                                                   "type":  "integer",
+                                                                                   "format":  "int64"
+                                                                               },
+                                                                        "action":  {
+                                                                                       "type":  "string",
+                                                                                       "enum":  [
+                                                                                                    "product.created",
+                                                                                                    "reservation.held",
+                                                                                                    "reservation.confirmed",
+                                                                                                    "reservation.cancelled"
+                                                                                                ]
+                                                                                   },
+                                                                        "productId":  {
+                                                                                          "type":  "integer",
+                                                                                          "format":  "int64"
+                                                                                      },
+                                                                        "reservationId":  {
+                                                                                              "type":  "integer",
+                                                                                              "format":  "int64",
+                                                                                              "nullable":  true
+                                                                                          },
+                                                                        "quantity":  {
+                                                                                         "type":  "integer"
+                                                                                     },
+                                                                        "happenedAt":  {
+                                                                                           "type":  "string",
+                                                                                           "format":  "date-time"
+                                                                                       }
+                                                                    }
+                                                 },
+                                       "ProductPage":  {
+                                                           "type":  "object",
+                                                           "required":  [
+                                                                            "items"
+                                                                        ],
+                                                           "properties":  {
+                                                                              "items":  {
+                                                                                            "type":  "array",
+                                                                                            "items":  {
+                                                                                                          "$ref":  "#/components/schemas/Product"
+                                                                                                      }
+                                                                                        },
+                                                                              "nextCursor":  {
+                                                                                                 "type":  "string"
+                                                                                             }
+                                                                          }
+                                                       },
+                                       "ReservationPage":  {
+                                                               "type":  "object",
+                                                               "required":  [
+                                                                                "items"
+                                                                            ],
+                                                               "properties":  {
+                                                                                  "items":  {
+                                                                                                "type":  "array",
+                                                                                                "items":  {
+                                                                                                              "$ref":  "#/components/schemas/Reservation"
+                                                                                                          }
+                                                                                            },
+                                                                                  "nextCursor":  {
+                                                                                                     "type":  "string"
+                                                                                                 }
+                                                                              }
+                                                           },
+                                       "AuditPage":  {
+                                                         "type":  "object",
+                                                         "required":  [
+                                                                          "items"
+                                                                      ],
+                                                         "properties":  {
+                                                                            "items":  {
+                                                                                          "type":  "array",
+                                                                                          "items":  {
+                                                                                                        "$ref":  "#/components/schemas/Event"
+                                                                                                    }
+                                                                                      },
+                                                                            "nextCursor":  {
+                                                                                               "type":  "string"
+                                                                                           }
+                                                                        }
+                                                     }
+                                   },
+                       "responses":  {
+                                         "ReservationOK":  {
+                                                               "description":  "Transition committed or original response replayed",
+                                                               "headers":  {
+                                                                               "Idempotency-Replayed":  {
+                                                                                                            "schema":  {
+                                                                                                                           "type":  "string",
+                                                                                                                           "enum":  [
+                                                                                                                                        "true"
+                                                                                                                                    ]
+                                                                                                                       }
+                                                                                                        }
+                                                                           },
+                                                               "content":  {
+                                                                               "application/json":  {
+                                                                                                        "schema":  {
+                                                                                                                       "$ref":  "#/components/schemas/Reservation"
+                                                                                                                   }
+                                                                                                    }
+                                                                           }
+                                                           },
+                                         "BadRequest":  {
+                                                            "description":  "Invalid JSON object, fields, ID, query or Idempotency-Key",
+                                                            "content":  {
+                                                                            "application/json":  {
+                                                                                                     "schema":  {
+                                                                                                                    "$ref":  "#/components/schemas/Error"
+                                                                                                                }
+                                                                                                 }
+                                                                        }
+                                                        },
+                                         "Unauthorized":  {
+                                                              "description":  "Missing or incorrect tenant API key",
+                                                              "content":  {
+                                                                              "application/json":  {
+                                                                                                       "schema":  {
+                                                                                                                      "$ref":  "#/components/schemas/Error"
+                                                                                                                  }
+                                                                                                   }
+                                                                          }
+                                                          },
+                                         "NotFound":  {
+                                                          "description":  "Resource does not exist for this tenant",
+                                                          "content":  {
+                                                                          "application/json":  {
+                                                                                                   "schema":  {
+                                                                                                                  "$ref":  "#/components/schemas/Error"
+                                                                                                              }
+                                                                                               }
+                                                                      }
+                                                      },
+                                         "Conflict":  {
+                                                          "description":  "Duplicate SKU, insufficient stock, terminal state, or Idempotency-Key reused for another request",
+                                                          "content":  {
+                                                                          "application/json":  {
+                                                                                                   "schema":  {
+                                                                                                                  "$ref":  "#/components/schemas/Error"
+                                                                                                              }
+                                                                                               }
+                                                                      }
+                                                      },
+                                         "Gone":  {
+                                                      "description":  "Hold has expired at server time",
+                                                      "content":  {
+                                                                      "application/json":  {
+                                                                                               "schema":  {
+                                                                                                              "$ref":  "#/components/schemas/Error"
+                                                                                                          }
+                                                                                           }
+                                                                  }
+                                                  },
+                                         "TooLarge":  {
+                                                          "description":  "Request body exceeds 4096 bytes",
+                                                          "content":  {
+                                                                          "application/json":  {
+                                                                                                   "schema":  {
+                                                                                                                  "$ref":  "#/components/schemas/Error"
+                                                                                                              }
+                                                                                               }
+                                                                      }
+                                                      },
+                                         "MediaType":  {
+                                                           "description":  "Content-Type must be application/json",
+                                                           "content":  {
+                                                                           "application/json":  {
+                                                                                                    "schema":  {
+                                                                                                                   "$ref":  "#/components/schemas/Error"
+                                                                                                               }
+                                                                                                }
+                                                                       }
+                                                       },
+                                         "Unavailable":  {
+                                                             "description":  "Database operation failed or timed out. Retry a write using its original key; commit acknowledgement can be uncertain.",
+                                                             "headers":  {
+                                                                             "Retry-After":  {
+                                                                                                 "schema":  {
+                                                                                                                "type":  "string",
+                                                                                                                "enum":  [
+                                                                                                                             "1"
+                                                                                                                         ]
+                                                                                                            }
+                                                                                             }
+                                                                         },
+                                                             "content":  {
+                                                                             "application/json":  {
+                                                                                                      "schema":  {
+                                                                                                                     "$ref":  "#/components/schemas/Error"
+                                                                                                                 }
+                                                                                                  }
+                                                                         }
+                                                         }
+                                     }
+                   }
+}

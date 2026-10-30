@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: reserveflow
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:?Test password is required}
+      POSTGRES_DB: reserveflow_test
+    ports:
+      - "127.0.0.1:5453:5432"
+    tmpfs:
+      - /var/lib/postgresql/data:size=128m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reserveflow -d reserveflow_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    cpus: 1.0
+  tests:
+    image: reserveflow-tests:local
+    build:
+      context: .
+      target: tests
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RESERVEFLOW_TEST_DATABASE_URL: postgres://reserveflow:${TEST_DB_PASSWORD}@db:5432/reserveflow_test?sslmode=disable
+      REQUIRE_DB_TESTS: "1"
+      GOMEMLIMIT: 256MiB
+      GOMAXPROCS: "2"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 384m
+    cpus: 1.0

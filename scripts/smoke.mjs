@@ -1,0 +1,37 @@
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import assert from 'node:assert/strict';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const env = Object.fromEntries(readFileSync(resolve(root,'.env'),'utf8').split(/\r?\n/).filter(line => line && !line.startsWith('#')).map(line => {const i=line.indexOf('=');return [line.slice(0,i),line.slice(i+1)];}));
+const base = process.env.RESERVEFLOW_BASE_URL || 'http://127.0.0.1:8099';
+const alpha = env.ALPHA_API_KEY;
+const beta = env.BETA_API_KEY;
+const evidence = [];
+async function request(method,path,body,key,token=alpha) {
+  const headers = {'Content-Type':'application/json'};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (key) headers['Idempotency-Key'] = key;
+  const r = await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(15000)});
+  const text = await r.text();
+  evidence.push({method,path,status:r.status,replayed:r.headers.get('Idempotency-Replayed')==='true'});
+  return {status:r.status,text,data:JSON.parse(text),replayed:r.headers.get('Idempotency-Replayed')==='true'};
+}
+const suffix=randomUUID().replaceAll('-','').slice(0,12).toUpperCase();
+assert.equal((await request('GET','/healthz',undefined,undefined,'')).status,200);
+assert.equal((await request('GET','/v1/products',undefined,undefined,'')).status,401);
+const p=await request('POST','/v1/products',{sku:`SMOKE-${suffix}`,name:'Synthetic smoke stock',onHand:1});assert.equal(p.status,201);
+const input={productId:p.data.id,quantity:1,ttlSeconds:60};const key=`hold-${suffix}`;
+const hold=await request('POST','/v1/reservations',input,key);assert.equal(hold.status,201);
+const replay=await request('POST','/v1/reservations',input,key);assert.equal(replay.text,hold.text);assert.equal(replay.replayed,true);
+assert.equal((await request('POST','/v1/reservations',{...input,quantity:2},key)).status,409);
+assert.equal((await request('GET',`/v1/reservations/${hold.data.id}`,undefined,undefined,beta)).status,404);
+assert.equal((await request('GET',`/v1/products/${p.data.id}`,undefined,undefined,beta)).status,404);
+assert.equal((await request('POST','/v1/reservations',input,`another-${suffix}`)).status,409);
+assert.equal((await request('POST',`/v1/reservations/${hold.data.id}/confirm`,{},`confirm-${suffix}`)).status,200);
+const current=await request('GET',`/v1/products/${p.data.id}`);assert.equal(current.data.onHand,0);assert.equal(current.data.reserved,0);assert.equal(current.data.available,0);
+const audit=await request('GET','/v1/audit?limit=100');assert.equal(audit.status,200);assert.ok(Array.isArray(audit.data.items));
+mkdirSync(resolve(root,'.local'),{recursive:true});
+writeFileSync(resolve(root,'.local','smoke-report.json'),JSON.stringify({recordedAt:new Date().toISOString(),evidence},null,2)+'\n');
+console.log(`HTTP smoke passed: ${evidence.length} requests. Evidence: .local/smoke-report.json`);

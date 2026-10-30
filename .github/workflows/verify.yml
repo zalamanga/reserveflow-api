@@ -1,0 +1,51 @@
+name: Verify REST API
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TEST_DB_PASSWORD: ${{ github.run_id }}-reserveflow-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Initialize private synthetic credentials
+        run: node scripts/init.mjs
+      - name: Validate Compose configuration
+        run: |
+          docker compose -f compose.yml -p reserveflow config --quiet
+          docker compose -f compose.test.yml -p reserveflow-test config --quiet
+      - name: Build one Go builder and run PostgreSQL integration tests
+        run: |
+          docker compose -f compose.test.yml -p reserveflow-test build tests
+          docker compose -f compose.test.yml -p reserveflow-test up -d --wait db
+          docker compose -f compose.test.yml -p reserveflow-test run --rm --no-deps tests
+          docker compose -f compose.test.yml -p reserveflow-test down
+      - name: Export verified Linux binaries
+        run: docker build --target binaries --output type=local,dest=.local/binaries .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reserveflow-linux-binaries
+          path: .local/binaries/
+          retention-days: 3
+      - name: Run API and exercise actual HTTP contract
+        run: |
+          docker compose -f compose.yml -p reserveflow build api
+          docker compose -f compose.yml -p reserveflow up -d --wait
+          node scripts/smoke.mjs
+      - name: Failure diagnostics
+        if: failure()
+        run: |
+          docker compose -f compose.yml -p reserveflow logs --tail 80
+          docker compose -f compose.test.yml -p reserveflow-test logs --tail 80
+      - name: Stop only these isolated environments
+        if: always()
+        run: |
+          docker compose -f compose.yml -p reserveflow down
+          docker compose -f compose.test.yml -p reserveflow-test down

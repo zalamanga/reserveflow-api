@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: reserveflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Run scripts/Init.ps1}
+      POSTGRES_DB: reserveflow
+    ports:
+      - "127.0.0.1:5452:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reserveflow -d reserveflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    cpus: 1.0
+  api:
+    image: reserveflow-api:local
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://reserveflow:${DB_PASSWORD}@db:5432/reserveflow?sslmode=disable
+      ALPHA_KEY_SHA256: ${ALPHA_KEY_SHA256:?Run scripts/Init.ps1}
+      BETA_KEY_SHA256: ${BETA_KEY_SHA256:?Run scripts/Init.ps1}
+      GOMEMLIMIT: 128MiB
+      GOMAXPROCS: "2"
+    ports:
+      - "127.0.0.1:8099:8080"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 192m
+    cpus: 1.0
+volumes:
+  pgdata:
+    name: reserveflow_pgdata

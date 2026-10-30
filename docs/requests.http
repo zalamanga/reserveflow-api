@@ -1,0 +1,54 @@
+@baseUrl = http://127.0.0.1:8099
+@alphaApiKey = REPLACE_PRIVATELY_FROM_LOCAL_CREDENTIALS
+@betaApiKey = REPLACE_PRIVATELY_FROM_LOCAL_CREDENTIALS
+@productId = 1
+@reservationId = 1
+
+### Health, no key
+GET {{baseUrl}}/healthz
+
+### Contract, no key
+GET {{baseUrl}}/openapi.json
+
+### Initial inventory, use another SKU for another run
+POST {{baseUrl}}/v1/products
+Authorization: Bearer {{alphaApiKey}}
+Content-Type: application/json
+
+{"sku":"REST-DEMO-001","name":"Synthetic REST stock","onHand":1}
+
+### Copy returned product ID above before continuing
+POST {{baseUrl}}/v1/reservations
+Authorization: Bearer {{alphaApiKey}}
+Idempotency-Key: rest-hold-0001
+Content-Type: application/json
+
+{"productId":{{productId}},"quantity":1,"ttlSeconds":300}
+
+### Repeat preceding request unchanged to replay it
+GET {{baseUrl}}/v1/products/{{productId}}
+Authorization: Bearer {{alphaApiKey}}
+
+### Foreign tenant gets 404
+GET {{baseUrl}}/v1/reservations/{{reservationId}}
+Authorization: Bearer {{betaApiKey}}
+
+### Copy returned reservation ID above before continuing
+POST {{baseUrl}}/v1/reservations/{{reservationId}}/confirm
+Authorization: Bearer {{alphaApiKey}}
+Idempotency-Key: rest-confirm-0001
+Content-Type: application/json
+
+{}
+
+### Another held reservation can be cancelled using its ID and a fresh key
+POST {{baseUrl}}/v1/reservations/{{reservationId}}/cancel
+Authorization: Bearer {{alphaApiKey}}
+Idempotency-Key: rest-cancel-0001
+Content-Type: application/json
+
+{}
+
+### Audit
+GET {{baseUrl}}/v1/audit?limit=20
+Authorization: Bearer {{alphaApiKey}}
